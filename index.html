@@ -2,18 +2,20 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <!-- Adicionado viewport-fit=cover para cobrir a área do notch/barra de navegação -->
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <!-- Adicionado viewport-fit=cover e height=device-height para garantir controle total -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, height=device-height">
     
-    <!-- Mágica para deixar a barra do navegador preta -->
+    <!-- Meta tags agressivas para cor do navegador -->
     <meta name="theme-color" content="#000000">
+    <meta name="background-color" content="#000000">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="mobile-web-app-capable" content="yes">
 
     <title>LED Scroller Ultimate</title>
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- Importação de Várias Fontes Estilosas -->
+    <!-- Importação de Fontes -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Anton&family=Bangers&family=Monoton&family=Orbitron:wght@900&family=Pacifico&family=Permanent+Marker&family=Press+Start+2P&family=Rubik+Mono+One&family=Share+Tech+Mono&display=swap" rel="stylesheet">
@@ -26,8 +28,15 @@
             --led-spacing: 6px;
         }
 
-        html, body {
-            background-color: #000000; /* Alterado para preto absoluto */
+        /* RESET AGRESSIVO DE FUNDO */
+        html {
+            background-color: #000000 !important;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        body {
+            background-color: #000000 !important;
             color: white;
             font-family: 'Segoe UI', sans-serif;
             overflow: hidden;
@@ -37,6 +46,20 @@
             width: 100%;
             margin: 0;
             padding: 0;
+            overscroll-behavior: none; /* Evita o efeito elástico branco no iPhone/Android */
+        }
+
+        /* Camada de segurança "Vazio Preto" 
+           Isso fica atrás de tudo e é maior que a tela para cobrir as barras quando elas somem */
+        #black-void {
+            position: fixed;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background-color: #000000;
+            z-index: -9999;
+            pointer-events: none;
         }
 
         /* --- UI Elements --- */
@@ -65,7 +88,6 @@
             box-shadow: 0 0 15px var(--led-color);
         }
 
-        /* Dropdown customizado */
         select {
             appearance: none;
             background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23FFFFFF%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
@@ -81,9 +103,8 @@
             left: 0;
             right: 0;
             bottom: 0;
-            width: 100vw;
-            height: 100vh; /* Fallback */
-            height: 100dvh; /* Dynamic viewport height para mobile */
+            width: 100%; 
+            height: 100%;
             background: var(--led-bg-color);
             z-index: 50;
             display: flex;
@@ -102,15 +123,18 @@
         }
 
         .rotate-screen {
-            /* Ajuste crítico para cobrir toda a tela quando rotacionado */
-            width: 100vh !important;
-            width: 100dvh !important;
-            height: 100vw !important;
+            /* Sobe para 102 para garantir sangria nas bordas (evita linha branca de 1px) */
+            width: 102dvh !important; 
+            height: 102vw !important;
+            
             position: fixed !important;
             top: 50% !important;
             left: 50% !important;
             transform: translate(-50%, -50%) rotate(90deg) !important;
             margin: 0 !important;
+            
+            /* Garante que o fundo preto cubra tudo mesmo girado */
+            box-shadow: 0 0 0 100vmax var(--led-bg-color); 
         }
 
         .marquee-wrapper {
@@ -132,23 +156,21 @@
             padding-inline: 50px; 
         }
 
-        /* Efeito de Grade */
         .dot-matrix-overlay {
             position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
+            top: -50%; /* Estende a grade para fora da tela por segurança */
+            left: -50%;
+            width: 200%;
+            height: 200%;
             z-index: 60;
             pointer-events: none;
             background-image: radial-gradient(circle, transparent 35%, rgba(0,0,0,0.85) 42%);
             background-size: var(--led-spacing) var(--led-spacing); 
         }
 
-        /* Dica de "Toque para sair" */
         .tap-hint {
             position: fixed;
-            bottom: 30px; /* Subido um pouco para evitar a barra de home do iPhone */
+            bottom: 40px; 
             left: 50%;
             transform: translateX(-50%);
             color: rgba(255,255,255,0.5);
@@ -161,6 +183,8 @@
             text-transform: uppercase;
             animation: pulse 3s infinite;
             text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+            /* Garante que a dica não rotacione junto com a tela no modo paisagem forçado, 
+               mas aqui ela é filha do container, então vamos mantê-la simples */
         }
         
         @keyframes pulse {
@@ -171,6 +195,9 @@
     </style>
 </head>
 <body class="flex flex-col h-screen bg-black">
+
+    <!-- CAMADA DE SEGURANÇA CONTRA FUNDO BRANCO -->
+    <div id="black-void"></div>
 
     <!-- SETUP SCREEN -->
     <main id="setup-panel" class="flex-1 flex flex-col justify-center items-center p-4 w-full max-w-md mx-auto relative z-10">
@@ -214,7 +241,7 @@
                     </label>
                 </div>
 
-                <!-- Cor Fundo (NOVO) -->
+                <!-- Cor Fundo -->
                 <div class="bg-[#151515] rounded-xl border border-[#333] p-2 flex items-center justify-between px-3 relative overflow-hidden group hover:border-gray-500 transition-colors">
                     <span class="text-[10px] font-bold text-gray-400 tracking-widest">FUNDO</span>
                     <label class="relative w-8 h-8 rounded-full shadow-inner cursor-pointer hover:scale-110 transition-transform">
@@ -268,9 +295,7 @@
         <div id="marquee" class="marquee-wrapper">
             <span id="led-text" class="led-text"></span>
         </div>
-        <!-- Efeito de grade -->
         <div class="dot-matrix-overlay"></div>
-        <!-- Dica visual -->
         <div class="tap-hint">Toque para voltar</div>
     </div>
 
@@ -291,7 +316,8 @@
             speedDisplay: document.getElementById('speed-display'),
             displayContainer: document.getElementById('display-container'),
             marquee: document.getElementById('marquee'),
-            ledText: document.getElementById('led-text')
+            ledText: document.getElementById('led-text'),
+            blackVoid: document.getElementById('black-void')
         };
 
         let animationFrameId;
@@ -308,7 +334,6 @@
             els.inputText.style.borderColor = color;
             els.inputText.style.boxShadow = `0 0 10px ${color}30`;
             
-            // Atualiza bordas da UI para combinar
             els.inputFont.style.borderColor = `${color}40`;
             els.inputSize.style.borderColor = `${color}40`;
             
@@ -321,20 +346,22 @@
             els.bgColorPreview.style.backgroundColor = color;
             els.bgColorPreview.style.boxShadow = `0 0 5px rgba(255,255,255,0.2)`;
             
-            // Atualiza a variável CSS e TAMBÉM o tema do navegador dinamicamente
             document.documentElement.style.setProperty('--led-bg-color', color);
             
-            // Tenta atualizar a meta tag theme-color dinamicamente se o fundo mudar
+            // Força o Void e o body a também mudarem para a cor escolhida
+            // caso o usuário escolha um fundo azul, por exemplo, o "void" será azul
+            els.blackVoid.style.backgroundColor = color;
+            document.body.style.backgroundColor = color;
+            document.documentElement.style.backgroundColor = color;
+
             const metaThemeColor = document.querySelector("meta[name=theme-color]");
             if(metaThemeColor) metaThemeColor.setAttribute("content", color);
         });
 
-        // Preview da fonte
         els.inputFont.addEventListener('change', (e) => {
             els.inputText.style.fontFamily = e.target.value.split(',')[0].replace(/'/g, "");
         });
 
-        // Display Velocidade
         els.inputSpeed.addEventListener('input', (e) => {
             const val = parseInt(e.target.value);
             let label = "NORMAL";
@@ -355,10 +382,12 @@
             els.ledText.innerText = text;
             els.ledText.style.fontFamily = selectedFont;
             
+            // Forçar scroll para o topo para esconder barras em alguns navegadores
+            window.scrollTo(0, 1);
+
             // Configura rotação e tamanho
             if(shouldRotate) {
                 els.displayContainer.classList.add('rotate-screen');
-                // Ajuste para telas estreitas quando rotacionado
                 els.ledText.style.fontSize = `${sizeBase}vw`; 
             } else {
                 els.displayContainer.classList.remove('rotate-screen');
@@ -367,20 +396,16 @@
 
             els.displayContainer.classList.add('active');
             
-            // Tenta Fullscreen
             try {
                 if (document.documentElement.requestFullscreen) {
                     document.documentElement.requestFullscreen();
-                } else if (document.documentElement.webkitRequestFullscreen) { /* Safari */
+                } else if (document.documentElement.webkitRequestFullscreen) {
                     document.documentElement.webkitRequestFullscreen();
-                } else if (document.documentElement.msRequestFullscreen) { /* IE11 */
-                    document.documentElement.msRequestFullscreen();
                 }
             } catch(e) {
-                console.log("Fullscreen not supported or blocked");
+                console.log("Fullscreen error:", e);
             }
 
-            // Inicia loop
             requestAnimationFrame(() => {
                 runMarquee(speedVal, shouldRotate);
             });
@@ -388,12 +413,9 @@
 
         function runMarquee(speedValue, isRotated) {
             const textWidth = els.ledText.offsetWidth;
-            // Detecta dimensão correta dependendo da rotação
             const viewWidth = isRotated ? window.innerHeight : window.innerWidth;
             
             let position = viewWidth;
-            
-            // Cálculo de velocidade (ajuste fino)
             const pixelsPerFrame = Math.pow(speedValue, 1.8) / 140; 
 
             if(animationFrameId) cancelAnimationFrame(animationFrameId);
@@ -401,7 +423,6 @@
             function step() {
                 position -= pixelsPerFrame;
 
-                // Reinicia loop
                 if (position < (-textWidth - (viewWidth * 0.2))) {
                     position = viewWidth; 
                 }
@@ -420,19 +441,15 @@
             
             if(animationFrameId) cancelAnimationFrame(animationFrameId);
             
-            // Sai do Fullscreen
             if (document.exitFullscreen && document.fullscreenElement) {
                 document.exitFullscreen().catch(()=>{});
-            } else if (document.webkitExitFullscreen) { /* Safari */
+            } else if (document.webkitExitFullscreen) {
                 document.webkitExitFullscreen();
             }
         }
 
-        // --- Lógica de Saída ---
         els.displayContainer.addEventListener('click', stopApp);
         els.displayContainer.addEventListener('touchstart', (e) => {
-            // Pequeno delay para evitar cliques acidentais ao tentar rodar a tela
-            // Mas permitindo o toque para sair
             e.preventDefault();
             stopApp();
         }, {passive: false});
