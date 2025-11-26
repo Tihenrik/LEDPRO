@@ -2,7 +2,14 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <!-- Adicionado viewport-fit=cover para cobrir a área do notch/barra de navegação -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    
+    <!-- Mágica para deixar a barra do navegador preta -->
+    <meta name="theme-color" content="#000000">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
     <title>LED Scroller Ultimate</title>
     <script src="https://cdn.tailwindcss.com"></script>
     
@@ -14,18 +21,22 @@
     <style>
         :root {
             --led-color: #00ff00;
-            --led-bg-color: #000000; /* Nova variável para o fundo */
+            --led-bg-color: #000000;
             --led-size: 4px;
             --led-spacing: 6px;
         }
 
-        body {
-            background-color: #050505;
+        html, body {
+            background-color: #000000; /* Alterado para preto absoluto */
             color: white;
             font-family: 'Segoe UI', sans-serif;
             overflow: hidden;
             touch-action: none; 
             user-select: none;
+            height: 100%;
+            width: 100%;
+            margin: 0;
+            padding: 0;
         }
 
         /* --- UI Elements --- */
@@ -68,9 +79,12 @@
             position: fixed;
             top: 0;
             left: 0;
+            right: 0;
+            bottom: 0;
             width: 100vw;
-            height: 100vh;
-            background: var(--led-bg-color); /* Agora usa a variável */
+            height: 100vh; /* Fallback */
+            height: 100dvh; /* Dynamic viewport height para mobile */
+            background: var(--led-bg-color);
             z-index: 50;
             display: flex;
             align-items: center;
@@ -78,7 +92,7 @@
             pointer-events: none;
             transition: opacity 0.3s ease;
             overflow: hidden;
-            transform-origin: top left;
+            transform-origin: center center;
             cursor: pointer;
         }
 
@@ -88,12 +102,14 @@
         }
 
         .rotate-screen {
+            /* Ajuste crítico para cobrir toda a tela quando rotacionado */
             width: 100vh !important;
+            width: 100dvh !important;
             height: 100vw !important;
-            transform: rotate(90deg) translateY(-100%);
             position: fixed !important;
-            top: 0 !important;
-            left: 0 !important;
+            top: 50% !important;
+            left: 50% !important;
+            transform: translate(-50%, -50%) rotate(90deg) !important;
             margin: 0 !important;
         }
 
@@ -125,7 +141,6 @@
             height: 100%;
             z-index: 60;
             pointer-events: none;
-            /* Gradiente levemente ajustado para funcionar com fundo colorido, mas mantendo a grade escura */
             background-image: radial-gradient(circle, transparent 35%, rgba(0,0,0,0.85) 42%);
             background-size: var(--led-spacing) var(--led-spacing); 
         }
@@ -133,7 +148,7 @@
         /* Dica de "Toque para sair" */
         .tap-hint {
             position: fixed;
-            bottom: 20px;
+            bottom: 30px; /* Subido um pouco para evitar a barra de home do iPhone */
             left: 50%;
             transform: translateX(-50%);
             color: rgba(255,255,255,0.5);
@@ -155,7 +170,7 @@
 
     </style>
 </head>
-<body class="flex flex-col h-screen bg-neutral-950 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-gray-900 via-black to-black">
+<body class="flex flex-col h-screen bg-black">
 
     <!-- SETUP SCREEN -->
     <main id="setup-panel" class="flex-1 flex flex-col justify-center items-center p-4 w-full max-w-md mx-auto relative z-10">
@@ -263,14 +278,14 @@
         const els = {
             inputText: document.getElementById('input-text'),
             inputColor: document.getElementById('input-color'),
-            inputBgColor: document.getElementById('input-bg-color'), // Novo
+            inputBgColor: document.getElementById('input-bg-color'),
             inputSize: document.getElementById('input-size'),
             inputFont: document.getElementById('input-font'),
             inputSpeed: document.getElementById('input-speed'),
             checkRotate: document.getElementById('check-rotate'),
             
             colorPreview: document.getElementById('color-preview'),
-            bgColorPreview: document.getElementById('bg-color-preview'), // Novo
+            bgColorPreview: document.getElementById('bg-color-preview'),
             
             logoColor: document.getElementById('logo-color'),
             speedDisplay: document.getElementById('speed-display'),
@@ -300,14 +315,18 @@
             document.documentElement.style.setProperty('--led-color', color);
         });
 
-        // Atualiza cor do FUNDO (Nova Função)
+        // Atualiza cor do FUNDO
         els.inputBgColor.addEventListener('input', (e) => {
             const color = e.target.value;
             els.bgColorPreview.style.backgroundColor = color;
-            // Se for muito escuro, usa sombra branca, se for claro, usa sombra preta no preview
-            els.bgColorPreview.style.boxShadow = `0 0 5px rgba(255,255,255,0.2)`; 
+            els.bgColorPreview.style.boxShadow = `0 0 5px rgba(255,255,255,0.2)`;
             
+            // Atualiza a variável CSS e TAMBÉM o tema do navegador dinamicamente
             document.documentElement.style.setProperty('--led-bg-color', color);
+            
+            // Tenta atualizar a meta tag theme-color dinamicamente se o fundo mudar
+            const metaThemeColor = document.querySelector("meta[name=theme-color]");
+            if(metaThemeColor) metaThemeColor.setAttribute("content", color);
         });
 
         // Preview da fonte
@@ -339,6 +358,7 @@
             // Configura rotação e tamanho
             if(shouldRotate) {
                 els.displayContainer.classList.add('rotate-screen');
+                // Ajuste para telas estreitas quando rotacionado
                 els.ledText.style.fontSize = `${sizeBase}vw`; 
             } else {
                 els.displayContainer.classList.remove('rotate-screen');
@@ -351,8 +371,14 @@
             try {
                 if (document.documentElement.requestFullscreen) {
                     document.documentElement.requestFullscreen();
+                } else if (document.documentElement.webkitRequestFullscreen) { /* Safari */
+                    document.documentElement.webkitRequestFullscreen();
+                } else if (document.documentElement.msRequestFullscreen) { /* IE11 */
+                    document.documentElement.msRequestFullscreen();
                 }
-            } catch(e) {}
+            } catch(e) {
+                console.log("Fullscreen not supported or blocked");
+            }
 
             // Inicia loop
             requestAnimationFrame(() => {
@@ -362,6 +388,7 @@
 
         function runMarquee(speedValue, isRotated) {
             const textWidth = els.ledText.offsetWidth;
+            // Detecta dimensão correta dependendo da rotação
             const viewWidth = isRotated ? window.innerHeight : window.innerWidth;
             
             let position = viewWidth;
@@ -393,14 +420,19 @@
             
             if(animationFrameId) cancelAnimationFrame(animationFrameId);
             
+            // Sai do Fullscreen
             if (document.exitFullscreen && document.fullscreenElement) {
                 document.exitFullscreen().catch(()=>{});
+            } else if (document.webkitExitFullscreen) { /* Safari */
+                document.webkitExitFullscreen();
             }
         }
 
         // --- Lógica de Saída ---
         els.displayContainer.addEventListener('click', stopApp);
         els.displayContainer.addEventListener('touchstart', (e) => {
+            // Pequeno delay para evitar cliques acidentais ao tentar rodar a tela
+            // Mas permitindo o toque para sair
             e.preventDefault();
             stopApp();
         }, {passive: false});
@@ -408,3 +440,4 @@
     </script>
 </body>
 </html>
+
