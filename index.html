@@ -2,12 +2,14 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <!-- Adicionado viewport-fit=cover e height=device-height para garantir controle total -->
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, height=device-height">
+    <!-- Adicionado viewport-fit=cover para pintar a área do notch/topo, mas respeitando as safe-areas no CSS -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     
-    <!-- Meta tags agressivas para cor do navegador -->
+    <!-- Pinta a barra superior (status bar) de preto -->
     <meta name="theme-color" content="#000000">
     <meta name="background-color" content="#000000">
+    
+    <!-- Configurações para Web App (se salvo na home) -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="mobile-web-app-capable" content="yes">
@@ -28,7 +30,6 @@
             --led-spacing: 6px;
         }
 
-        /* RESET AGRESSIVO DE FUNDO */
         html {
             background-color: #000000 !important;
             height: 100%;
@@ -42,24 +43,12 @@
             overflow: hidden;
             touch-action: none; 
             user-select: none;
-            height: 100%;
+            /* Usar dvh garante que ocupamos apenas a altura visível, sem invadir a barra inferior do navegador */
+            height: 100dvh; 
             width: 100%;
             margin: 0;
             padding: 0;
-            overscroll-behavior: none; /* Evita o efeito elástico branco no iPhone/Android */
-        }
-
-        /* Camada de segurança "Vazio Preto" 
-           Isso fica atrás de tudo e é maior que a tela para cobrir as barras quando elas somem */
-        #black-void {
-            position: fixed;
-            top: -50%;
-            left: -50%;
-            width: 200%;
-            height: 200%;
-            background-color: #000000;
-            z-index: -9999;
-            pointer-events: none;
+            overscroll-behavior: none;
         }
 
         /* --- UI Elements --- */
@@ -99,12 +88,12 @@
         /* --- O Display de LED --- */
         #display-container {
             position: fixed;
-            top: 0;
+            /* Estende até o topo absoluto (cobrindo atrás da barra de status se possível) */
+            top: 0; 
             left: 0;
             right: 0;
-            bottom: 0;
-            width: 100%; 
-            height: 100%;
+            /* Define a altura como 100dvh para parar EXATAMENTE onde começa a barra do navegador em baixo */
+            height: 100dvh;
             background: var(--led-bg-color);
             z-index: 50;
             display: flex;
@@ -115,6 +104,10 @@
             overflow: hidden;
             transform-origin: center center;
             cursor: pointer;
+            
+            /* Garante que o conteúdo não fique escondido atrás de notches ou barras */
+            padding-top: env(safe-area-inset-top);
+            padding-bottom: env(safe-area-inset-bottom);
         }
 
         #display-container.active {
@@ -123,9 +116,9 @@
         }
 
         .rotate-screen {
-            /* Sobe para 102 para garantir sangria nas bordas (evita linha branca de 1px) */
-            width: 102dvh !important; 
-            height: 102vw !important;
+            /* Ajuste para rotação dentro da área visível */
+            width: 100dvh !important; 
+            height: 100vw !important;
             
             position: fixed !important;
             top: 50% !important;
@@ -133,7 +126,7 @@
             transform: translate(-50%, -50%) rotate(90deg) !important;
             margin: 0 !important;
             
-            /* Garante que o fundo preto cubra tudo mesmo girado */
+            /* Garante fundo preto nas bordas ao girar */
             box-shadow: 0 0 0 100vmax var(--led-bg-color); 
         }
 
@@ -158,7 +151,7 @@
 
         .dot-matrix-overlay {
             position: absolute;
-            top: -50%; /* Estende a grade para fora da tela por segurança */
+            top: -50%;
             left: -50%;
             width: 200%;
             height: 200%;
@@ -183,8 +176,6 @@
             text-transform: uppercase;
             animation: pulse 3s infinite;
             text-shadow: 0 1px 2px rgba(0,0,0,0.8);
-            /* Garante que a dica não rotacione junto com a tela no modo paisagem forçado, 
-               mas aqui ela é filha do container, então vamos mantê-la simples */
         }
         
         @keyframes pulse {
@@ -194,13 +185,10 @@
 
     </style>
 </head>
-<body class="flex flex-col h-screen bg-black">
-
-    <!-- CAMADA DE SEGURANÇA CONTRA FUNDO BRANCO -->
-    <div id="black-void"></div>
+<body class="flex flex-col bg-black">
 
     <!-- SETUP SCREEN -->
-    <main id="setup-panel" class="flex-1 flex flex-col justify-center items-center p-4 w-full max-w-md mx-auto relative z-10">
+    <main id="setup-panel" class="flex-1 flex flex-col justify-center items-center p-4 w-full max-w-md mx-auto relative z-10 h-full">
         
         <div class="mb-5 text-center scale-90">
             <h1 class="text-6xl font-black text-white mb-0 tracking-tighter" style="font-family: 'Share Tech Mono'">LED<span id="logo-color" class="text-green-500">PRO</span></h1>
@@ -316,15 +304,13 @@
             speedDisplay: document.getElementById('speed-display'),
             displayContainer: document.getElementById('display-container'),
             marquee: document.getElementById('marquee'),
-            ledText: document.getElementById('led-text'),
-            blackVoid: document.getElementById('black-void')
+            ledText: document.getElementById('led-text')
         };
 
         let animationFrameId;
 
         // --- UI Updates ---
         
-        // Atualiza cor do TEXTO
         els.inputColor.addEventListener('input', (e) => {
             const color = e.target.value;
             els.colorPreview.style.backgroundColor = color;
@@ -340,7 +326,6 @@
             document.documentElement.style.setProperty('--led-color', color);
         });
 
-        // Atualiza cor do FUNDO
         els.inputBgColor.addEventListener('input', (e) => {
             const color = e.target.value;
             els.bgColorPreview.style.backgroundColor = color;
@@ -348,12 +333,8 @@
             
             document.documentElement.style.setProperty('--led-bg-color', color);
             
-            // Força o Void e o body a também mudarem para a cor escolhida
-            // caso o usuário escolha um fundo azul, por exemplo, o "void" será azul
-            els.blackVoid.style.backgroundColor = color;
+            // Muda a cor do tema para pintar a barra superior da cor do fundo
             document.body.style.backgroundColor = color;
-            document.documentElement.style.backgroundColor = color;
-
             const metaThemeColor = document.querySelector("meta[name=theme-color]");
             if(metaThemeColor) metaThemeColor.setAttribute("content", color);
         });
@@ -382,8 +363,8 @@
             els.ledText.innerText = text;
             els.ledText.style.fontFamily = selectedFont;
             
-            // Forçar scroll para o topo para esconder barras em alguns navegadores
-            window.scrollTo(0, 1);
+            // Scroll para garantir posicionamento
+            window.scrollTo(0, 0);
 
             // Configura rotação e tamanho
             if(shouldRotate) {
@@ -396,15 +377,8 @@
 
             els.displayContainer.classList.add('active');
             
-            try {
-                if (document.documentElement.requestFullscreen) {
-                    document.documentElement.requestFullscreen();
-                } else if (document.documentElement.webkitRequestFullscreen) {
-                    document.documentElement.webkitRequestFullscreen();
-                }
-            } catch(e) {
-                console.log("Fullscreen error:", e);
-            }
+            // REMOVIDO: requestFullscreen() 
+            // Isso evita que o navegador esconda a barra inferior ou altere o layout drasticamente.
 
             requestAnimationFrame(() => {
                 runMarquee(speedVal, shouldRotate);
@@ -413,6 +387,7 @@
 
         function runMarquee(speedValue, isRotated) {
             const textWidth = els.ledText.offsetWidth;
+            // Usa innerHeight/innerWidth para calcular baseado no espaço VISÍVEL apenas
             const viewWidth = isRotated ? window.innerHeight : window.innerWidth;
             
             let position = viewWidth;
@@ -438,14 +413,8 @@
 
         function stopApp() {
             els.displayContainer.classList.remove('active');
-            
             if(animationFrameId) cancelAnimationFrame(animationFrameId);
-            
-            if (document.exitFullscreen && document.fullscreenElement) {
-                document.exitFullscreen().catch(()=>{});
-            } else if (document.webkitExitFullscreen) {
-                document.webkitExitFullscreen();
-            }
+            // Removido o exitFullscreen pois não entramos em fullscreen
         }
 
         els.displayContainer.addEventListener('click', stopApp);
