@@ -2,14 +2,11 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <!-- Adicionado viewport-fit=cover para pintar a área do notch/topo, mas respeitando as safe-areas no CSS -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     
-    <!-- Pinta a barra superior (status bar) de preto -->
     <meta name="theme-color" content="#000000">
     <meta name="background-color" content="#000000">
     
-    <!-- Configurações para Web App (se salvo na home) -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="mobile-web-app-capable" content="yes">
@@ -17,7 +14,6 @@
     <title>LED Scroller Ultimate</title>
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- Importação de Fontes -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Anton&family=Bangers&family=Monoton&family=Orbitron:wght@900&family=Pacifico&family=Permanent+Marker&family=Press+Start+2P&family=Rubik+Mono+One&family=Share+Tech+Mono&display=swap" rel="stylesheet">
@@ -33,6 +29,7 @@
         html {
             background-color: #000000 !important;
             height: 100%;
+            width: 100%;
             overflow: hidden;
         }
 
@@ -43,12 +40,46 @@
             overflow: hidden;
             touch-action: none; 
             user-select: none;
-            /* Usar dvh garante que ocupamos apenas a altura visível, sem invadir a barra inferior do navegador */
             height: 100dvh; 
             width: 100%;
             margin: 0;
             padding: 0;
             overscroll-behavior: none;
+            position: relative;
+        }
+
+        /* BACKUP: Garante fundo preto se o navegador tentar mostrar bordas */
+        body::before {
+            content: "";
+            position: fixed;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background-color: #000000;
+            z-index: -9999;
+            pointer-events: none;
+        }
+
+        /* WRAPPER GERAL para Fullscreen Isolado */
+        #app-wrapper {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            background-color: #000000;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        #app-wrapper:fullscreen {
+            width: 100vw;
+            height: 100vh;
+            background-color: black;
+            display: flex;
+        }
+        #app-wrapper::backdrop {
+            background-color: black;
         }
 
         /* --- UI Elements --- */
@@ -85,19 +116,18 @@
             background-size: 0.65em auto;
         }
 
-        /* --- O Display de LED --- */
+        /* --- DISPLAY CONTAINER --- */
         #display-container {
-            position: fixed;
-            /* Estende até o topo absoluto (cobrindo atrás da barra de status se possível) */
+            position: absolute;
             top: 0; 
             left: 0;
-            right: 0;
-            /* Define a altura como 100dvh para parar EXATAMENTE onde começa a barra do navegador em baixo */
-            height: 100dvh;
+            width: 100%;
+            height: 100%;
             background: var(--led-bg-color);
             z-index: 50;
             display: flex;
-            align-items: center;
+            align-items: center; /* Centraliza verticalmente o texto */
+            justify-content: flex-start; /* Texto começa da esquerda (será movido via JS) */
             opacity: 0;
             pointer-events: none;
             transition: opacity 0.3s ease;
@@ -105,9 +135,8 @@
             transform-origin: center center;
             cursor: pointer;
             
-            /* Garante que o conteúdo não fique escondido atrás de notches ou barras */
-            padding-top: env(safe-area-inset-top);
-            padding-bottom: env(safe-area-inset-bottom);
+            /* Remove padding que possa atrapalhar o tamanho "GIGANTE" */
+            padding: 0; 
         }
 
         #display-container.active {
@@ -116,17 +145,15 @@
         }
 
         .rotate-screen {
-            /* Ajuste para rotação dentro da área visível */
-            width: 100dvh !important; 
+            width: 100vh !important; 
             height: 100vw !important;
             
-            position: fixed !important;
+            position: absolute !important;
             top: 50% !important;
             left: 50% !important;
             transform: translate(-50%, -50%) rotate(90deg) !important;
             margin: 0 !important;
             
-            /* Garante fundo preto nas bordas ao girar */
             box-shadow: 0 0 0 100vmax var(--led-bg-color); 
         }
 
@@ -135,10 +162,16 @@
             will-change: transform;
             position: absolute;
             left: 0;
+            /* Centraliza a faixa de texto verticalmente no container */
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            align-items: center;
         }
 
         .led-text {
-            line-height: 1;
+            /* Garante que a altura da linha seja compacta para caber na tela */
+            line-height: 0.85; 
             font-weight: bold;
             color: var(--led-color);
             text-transform: uppercase;
@@ -146,7 +179,8 @@
                 0 0 5px var(--led-color),
                 0 0 10px var(--led-color),
                 0 0 20px var(--led-color);
-            padding-inline: 50px; 
+            padding-inline: 20px; 
+            white-space: nowrap;
         }
 
         .dot-matrix-overlay {
@@ -185,110 +219,104 @@
 
     </style>
 </head>
-<body class="flex flex-col bg-black">
+<body class="bg-black">
 
-    <!-- SETUP SCREEN -->
-    <main id="setup-panel" class="flex-1 flex flex-col justify-center items-center p-4 w-full max-w-md mx-auto relative z-10 h-full">
-        
-        <div class="mb-5 text-center scale-90">
-            <h1 class="text-6xl font-black text-white mb-0 tracking-tighter" style="font-family: 'Share Tech Mono'">LED<span id="logo-color" class="text-green-500">PRO</span></h1>
-            <p class="text-gray-500 text-xs tracking-[0.3em] uppercase mt-1">Ultimate Edition</p>
-        </div>
-
-        <div class="glass-panel w-full p-5 rounded-3xl flex flex-col gap-4 shadow-2xl">
+    <div id="app-wrapper">
+        <!-- SETUP SCREEN -->
+        <main id="setup-panel" class="flex-1 flex flex-col justify-center items-center p-4 w-full max-w-md mx-auto relative z-10 h-full">
             
-            <!-- Entrada de Texto -->
-            <div>
-                <label class="text-[10px] font-bold text-gray-400 tracking-widest mb-1 ml-1 block">SUA MENSAGEM</label>
-                <input type="text" id="input-text" class="custom-input w-full p-3 rounded-xl text-xl text-center font-bold tracking-wider" placeholder="TEXTO" value="BEM VINDO" style="font-family: 'Share Tech Mono'">
+            <div class="mb-5 text-center scale-90">
+                <h1 class="text-6xl font-black text-white mb-0 tracking-tighter" style="font-family: 'Share Tech Mono'">LED<span id="logo-color" class="text-green-500">PRO</span></h1>
+                <p class="text-gray-500 text-xs tracking-[0.3em] uppercase mt-1">Ultimate Edition</p>
             </div>
 
-            <!-- Seleção de Fonte -->
-            <div>
-                <label class="text-[10px] font-bold text-gray-400 tracking-widest mb-1 ml-1 block">FONTE</label>
-                <select id="input-font" class="w-full bg-[#151515] border border-[#333] text-white p-3 rounded-xl text-sm focus:outline-none focus:border-green-500 transition-colors cursor-pointer">
-                    <option value="'Share Tech Mono', monospace">DIGITAL (Padrão)</option>
-                    <option value="'Orbitron', sans-serif">FUTURISTA</option>
-                    <option value="'Press Start 2P', cursive">RETRO GAMER</option>
-                    <option value="'Monoton', cursive">NEON LINES</option>
-                    <option value="'Rubik Mono One', sans-serif">IMPACTO PESADO</option>
-                    <option value="'Permanent Marker', cursive">GRAFFITI</option>
-                    <option value="'Bangers', cursive">QUADRINHOS</option>
-                    <option value="'Pacifico', cursive">CURSIVA ELEGANTE</option>
-                </select>
-            </div>
-
-            <!-- Cores (Texto e Fundo) -->
-            <div class="grid grid-cols-2 gap-3">
-                <!-- Cor Texto -->
-                <div class="bg-[#151515] rounded-xl border border-[#333] p-2 flex items-center justify-between px-3 relative overflow-hidden group hover:border-gray-500 transition-colors">
-                    <span class="text-[10px] font-bold text-gray-400 tracking-widest">TEXTO</span>
-                    <label class="relative w-8 h-8 rounded-full shadow-inner cursor-pointer hover:scale-110 transition-transform">
-                        <input type="color" id="input-color" value="#00ff00" class="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-20">
-                        <div id="color-preview" class="w-full h-full rounded-full bg-green-500 border-2 border-white/20 shadow-[0_0_10px_currentColor]"></div>
-                    </label>
+            <div class="glass-panel w-full p-5 rounded-3xl flex flex-col gap-4 shadow-2xl">
+                <!-- Inputs (Texto, Fonte, Cores) -->
+                <div>
+                    <label class="text-[10px] font-bold text-gray-400 tracking-widest mb-1 ml-1 block">SUA MENSAGEM</label>
+                    <input type="text" id="input-text" class="custom-input w-full p-3 rounded-xl text-xl text-center font-bold tracking-wider" placeholder="TEXTO" value="BEM VINDO" style="font-family: 'Share Tech Mono'">
                 </div>
 
-                <!-- Cor Fundo -->
-                <div class="bg-[#151515] rounded-xl border border-[#333] p-2 flex items-center justify-between px-3 relative overflow-hidden group hover:border-gray-500 transition-colors">
-                    <span class="text-[10px] font-bold text-gray-400 tracking-widest">FUNDO</span>
-                    <label class="relative w-8 h-8 rounded-full shadow-inner cursor-pointer hover:scale-110 transition-transform">
-                        <input type="color" id="input-bg-color" value="#000000" class="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-20">
-                        <div id="bg-color-preview" class="w-full h-full rounded-full bg-black border-2 border-white/20 shadow-sm"></div>
-                    </label>
-                </div>
-            </div>
-
-            <!-- Tamanho e Velocidade -->
-            <div class="grid grid-cols-2 gap-3">
-                <!-- Tamanho -->
-                <div class="relative">
-                    <label class="text-[9px] font-bold text-gray-500 tracking-widest mb-1 ml-1 block absolute -top-4 left-1">TAMANHO</label>
-                     <select id="input-size" class="w-full h-12 bg-[#151515] border border-[#333] text-white rounded-xl px-3 text-xs font-bold focus:outline-none focus:border-green-500 appearance-none">
-                        <option value="20">PEQUENO</option>
-                        <option value="40">MÉDIO</option>
-                        <option value="60">GRANDE</option>
-                        <option value="100" selected>GIGANTE</option>
+                <div>
+                    <label class="text-[10px] font-bold text-gray-400 tracking-widest mb-1 ml-1 block">FONTE</label>
+                    <select id="input-font" class="w-full bg-[#151515] border border-[#333] text-white p-3 rounded-xl text-sm focus:outline-none focus:border-green-500 transition-colors cursor-pointer">
+                        <option value="'Share Tech Mono', monospace">DIGITAL (Padrão)</option>
+                        <option value="'Orbitron', sans-serif">FUTURISTA</option>
+                        <option value="'Press Start 2P', cursive">RETRO GAMER</option>
+                        <option value="'Monoton', cursive">NEON LINES</option>
+                        <option value="'Rubik Mono One', sans-serif">IMPACTO PESADO</option>
+                        <option value="'Permanent Marker', cursive">GRAFFITI</option>
+                        <option value="'Bangers', cursive">QUADRINHOS</option>
+                        <option value="'Pacifico', cursive">CURSIVA ELEGANTE</option>
                     </select>
                 </div>
 
-                <!-- Velocidade -->
-                <div class="relative">
-                    <label class="text-[9px] font-bold text-gray-500 tracking-widest mb-1 ml-1 block absolute -top-4 left-1">
-                        VEL.: <span id="speed-display" class="text-green-400">NORMAL</span>
-                    </label>
-                    <div class="h-12 bg-[#151515] border border-[#333] rounded-xl flex items-center px-2">
-                        <input type="range" id="input-speed" min="10" max="100" value="50" class="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer">
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="bg-[#151515] rounded-xl border border-[#333] p-2 flex items-center justify-between px-3 relative overflow-hidden group hover:border-gray-500 transition-colors">
+                        <span class="text-[10px] font-bold text-gray-400 tracking-widest">TEXTO</span>
+                        <label class="relative w-8 h-8 rounded-full shadow-inner cursor-pointer hover:scale-110 transition-transform">
+                            <input type="color" id="input-color" value="#00ff00" class="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-20">
+                            <div id="color-preview" class="w-full h-full rounded-full bg-green-500 border-2 border-white/20 shadow-[0_0_10px_currentColor]"></div>
+                        </label>
+                    </div>
+
+                    <div class="bg-[#151515] rounded-xl border border-[#333] p-2 flex items-center justify-between px-3 relative overflow-hidden group hover:border-gray-500 transition-colors">
+                        <span class="text-[10px] font-bold text-gray-400 tracking-widest">FUNDO</span>
+                        <label class="relative w-8 h-8 rounded-full shadow-inner cursor-pointer hover:scale-110 transition-transform">
+                            <input type="color" id="input-bg-color" value="#000000" class="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-20">
+                            <div id="bg-color-preview" class="w-full h-full rounded-full bg-black border-2 border-white/20 shadow-sm"></div>
+                        </label>
                     </div>
                 </div>
-            </div>
 
-            <!-- Checkbox Rotação -->
-            <label class="flex items-center gap-3 p-3 mt-1 rounded-xl border border-white/5 bg-white/5 cursor-pointer hover:bg-white/10 transition-colors">
-                <input type="checkbox" id="check-rotate" checked class="w-4 h-4 rounded accent-green-500">
-                <div class="leading-tight">
-                    <span class="text-xs font-bold text-gray-200">Modo Paisagem (Girar Tela)</span>
+                <!-- Tamanho e Velocidade -->
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="relative">
+                        <label class="text-[9px] font-bold text-gray-500 tracking-widest mb-1 ml-1 block absolute -top-4 left-1">TAMANHO</label>
+                        <select id="input-size" class="w-full h-12 bg-[#151515] border border-[#333] text-white rounded-xl px-3 text-xs font-bold focus:outline-none focus:border-green-500 appearance-none">
+                            <option value="25">PEQUENO</option>
+                            <option value="50">MÉDIO</option>
+                            <option value="75">GRANDE</option>
+                            <!-- Valor ajustado para não estourar bordas -->
+                            <option value="95" selected>GIGANTE</option>
+                        </select>
+                    </div>
+
+                    <div class="relative">
+                        <label class="text-[9px] font-bold text-gray-500 tracking-widest mb-1 ml-1 block absolute -top-4 left-1">
+                            VEL.: <span id="speed-display" class="text-green-400">NORMAL</span>
+                        </label>
+                        <div class="h-12 bg-[#151515] border border-[#333] rounded-xl flex items-center px-2">
+                            <input type="range" id="input-speed" min="10" max="100" value="50" class="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer">
+                        </div>
+                    </div>
                 </div>
-            </label>
 
-            <!-- Botão Iniciar -->
-            <button onclick="startApp()" class="mt-2 w-full bg-gradient-to-r from-green-600 to-green-400 text-black font-black text-lg py-4 rounded-xl shadow-[0_0_20px_rgba(34,197,94,0.3)] hover:shadow-[0_0_30px_rgba(34,197,94,0.5)] hover:scale-[1.02] active:scale-[0.98] transition-all uppercase tracking-widest">
-                EXIBIR LETREIRO
-            </button>
-        </div>
-    </main>
+                <label class="flex items-center gap-3 p-3 mt-1 rounded-xl border border-white/5 bg-white/5 cursor-pointer hover:bg-white/10 transition-colors">
+                    <input type="checkbox" id="check-rotate" checked class="w-4 h-4 rounded accent-green-500">
+                    <div class="leading-tight">
+                        <span class="text-xs font-bold text-gray-200">Modo Paisagem (Girar Tela)</span>
+                    </div>
+                </label>
 
-    <!-- LED DISPLAY AREA -->
-    <div id="display-container">
-        <div id="marquee" class="marquee-wrapper">
-            <span id="led-text" class="led-text"></span>
+                <button onclick="startApp()" class="mt-2 w-full bg-gradient-to-r from-green-600 to-green-400 text-black font-black text-lg py-4 rounded-xl shadow-[0_0_20px_rgba(34,197,94,0.3)] hover:shadow-[0_0_30px_rgba(34,197,94,0.5)] hover:scale-[1.02] active:scale-[0.98] transition-all uppercase tracking-widest">
+                    EXIBIR LETREIRO
+                </button>
+            </div>
+        </main>
+
+        <div id="display-container">
+            <div id="marquee" class="marquee-wrapper">
+                <span id="led-text" class="led-text"></span>
+            </div>
+            <div class="dot-matrix-overlay"></div>
+            <div class="tap-hint">Toque para voltar</div>
         </div>
-        <div class="dot-matrix-overlay"></div>
-        <div class="tap-hint">Toque para voltar</div>
     </div>
 
     <script>
         const els = {
+            appWrapper: document.getElementById('app-wrapper'),
             inputText: document.getElementById('input-text'),
             inputColor: document.getElementById('input-color'),
             inputBgColor: document.getElementById('input-bg-color'),
@@ -309,8 +337,7 @@
 
         let animationFrameId;
 
-        // --- UI Updates ---
-        
+        // UI Updates
         els.inputColor.addEventListener('input', (e) => {
             const color = e.target.value;
             els.colorPreview.style.backgroundColor = color;
@@ -319,10 +346,8 @@
             els.inputText.style.color = color;
             els.inputText.style.borderColor = color;
             els.inputText.style.boxShadow = `0 0 10px ${color}30`;
-            
             els.inputFont.style.borderColor = `${color}40`;
             els.inputSize.style.borderColor = `${color}40`;
-            
             document.documentElement.style.setProperty('--led-color', color);
         });
 
@@ -330,11 +355,9 @@
             const color = e.target.value;
             els.bgColorPreview.style.backgroundColor = color;
             els.bgColorPreview.style.boxShadow = `0 0 5px rgba(255,255,255,0.2)`;
-            
             document.documentElement.style.setProperty('--led-bg-color', color);
-            
-            // Muda a cor do tema para pintar a barra superior da cor do fundo
             document.body.style.backgroundColor = color;
+            els.appWrapper.style.backgroundColor = color;
             const metaThemeColor = document.querySelector("meta[name=theme-color]");
             if(metaThemeColor) metaThemeColor.setAttribute("content", color);
         });
@@ -352,10 +375,10 @@
             els.speedDisplay.innerText = label;
         });
 
-        // --- APP ENGINE ---
+        // --- CORE LOGIC ---
         function startApp() {
             const text = els.inputText.value.trim() || "DIGITE ALGO";
-            const sizeBase = parseInt(els.inputSize.value); 
+            let sizeBase = parseInt(els.inputSize.value); 
             const speedVal = parseInt(els.inputSpeed.value);
             const shouldRotate = els.checkRotate.checked;
             const selectedFont = els.inputFont.value;
@@ -363,22 +386,31 @@
             els.ledText.innerText = text;
             els.ledText.style.fontFamily = selectedFont;
             
-            // Scroll para garantir posicionamento
             window.scrollTo(0, 0);
 
-            // Configura rotação e tamanho
             if(shouldRotate) {
+                // MODO PAISAGEM (GIRADO)
                 els.displayContainer.classList.add('rotate-screen');
+                // CORREÇÃO CRÍTICA: 
+                // A "altura" do texto no modo girado deve ser relativa à LARGURA da tela (vw), 
+                // pois a tela foi girada 90 graus. 
+                // Usar 'vh' aqui faria o texto ficar do tamanho da ALTURA do celular (enorme).
                 els.ledText.style.fontSize = `${sizeBase}vw`; 
             } else {
+                // MODO RETRATO (NORMAL)
                 els.displayContainer.classList.remove('rotate-screen');
+                // Aqui usamos 'vh' pois queremos preencher a altura vertical normal.
                 els.ledText.style.fontSize = `${sizeBase}vh`;
             }
 
             els.displayContainer.classList.add('active');
             
-            // REMOVIDO: requestFullscreen() 
-            // Isso evita que o navegador esconda a barra inferior ou altere o layout drasticamente.
+            // Ativa Fullscreen no Wrapper
+            if (els.appWrapper.requestFullscreen) {
+                els.appWrapper.requestFullscreen().catch(err => console.log(err));
+            } else if (els.appWrapper.webkitRequestFullscreen) {
+                els.appWrapper.webkitRequestFullscreen();
+            }
 
             requestAnimationFrame(() => {
                 runMarquee(speedVal, shouldRotate);
@@ -387,10 +419,17 @@
 
         function runMarquee(speedValue, isRotated) {
             const textWidth = els.ledText.offsetWidth;
-            // Usa innerHeight/innerWidth para calcular baseado no espaço VISÍVEL apenas
-            const viewWidth = isRotated ? window.innerHeight : window.innerWidth;
+            const containerW = els.appWrapper.clientWidth;
+            const containerH = els.appWrapper.clientHeight;
             
+            // Define o tamanho da "pista" de rolagem
+            const viewWidth = isRotated ? containerH : containerW;
+            
+            // Reseta a posição inicial do letreiro
+            // Se girado, ajustamos um pouco o ponto de partida
             let position = viewWidth;
+            
+            // Cálculo de velocidade
             const pixelsPerFrame = Math.pow(speedValue, 1.8) / 140; 
 
             if(animationFrameId) cancelAnimationFrame(animationFrameId);
@@ -398,11 +437,14 @@
             function step() {
                 position -= pixelsPerFrame;
 
+                // Reinicia quando o texto sair totalmente da tela
                 if (position < (-textWidth - (viewWidth * 0.2))) {
                     position = viewWidth; 
                 }
 
-                els.marquee.style.transform = `translateX(${position}px)`;
+                // Aplica a transformação. Nota: no CSS o .marquee-wrapper já está centralizado verticalmente
+                // então só precisamos mover o X.
+                els.marquee.style.transform = `translate(${position}px, -50%)`;
                 
                 if(els.displayContainer.classList.contains('active')) {
                     animationFrameId = requestAnimationFrame(step);
@@ -414,7 +456,11 @@
         function stopApp() {
             els.displayContainer.classList.remove('active');
             if(animationFrameId) cancelAnimationFrame(animationFrameId);
-            // Removido o exitFullscreen pois não entramos em fullscreen
+            
+            if (document.fullscreenElement || document.webkitFullscreenElement) {
+                if (document.exitFullscreen) document.exitFullscreen();
+                else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+            }
         }
 
         els.displayContainer.addEventListener('click', stopApp);
@@ -422,8 +468,13 @@
             e.preventDefault();
             stopApp();
         }, {passive: false});
+        
+        document.addEventListener('fullscreenchange', () => {
+            if (!document.fullscreenElement) stopApp();
+        });
 
     </script>
 </body>
 </html>
+
 
