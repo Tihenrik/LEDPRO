@@ -310,6 +310,8 @@
     </div>
 
     <script>
+        const STORAGE_KEY = 'led_ultimate_data_v1';
+
         const els = {
             appWrapper: document.getElementById('app-wrapper'),
             inputText: document.getElementById('input-text'),
@@ -332,7 +334,81 @@
 
         let animationFrameId;
 
-        // UI Updates
+        // ============================================
+        //      LOCAL STORAGE SYSTEM
+        // ============================================
+        function saveSettings() {
+            const data = {
+                text: els.inputText.value,
+                color: els.inputColor.value,
+                bgColor: els.inputBgColor.value,
+                size: els.inputSize.value,
+                font: els.inputFont.value,
+                speed: els.inputSpeed.value,
+                rotate: els.checkRotate.checked
+            };
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+        }
+
+        function loadSettings() {
+            const savedData = localStorage.getItem(STORAGE_KEY);
+            if (!savedData) return;
+
+            try {
+                const data = JSON.parse(savedData);
+                
+                // Restaura Valores
+                if(data.text !== undefined) els.inputText.value = data.text;
+                if(data.color) els.inputColor.value = data.color;
+                if(data.bgColor) els.inputBgColor.value = data.bgColor;
+                if(data.size) els.inputSize.value = data.size;
+                if(data.font) els.inputFont.value = data.font;
+                if(data.speed) els.inputSpeed.value = data.speed;
+                if(data.rotate !== undefined) els.checkRotate.checked = data.rotate;
+
+                // --- RESTAURA VISUAL (DISPARA UPDATES) ---
+                
+                // Cor do Texto/LED
+                const color = els.inputColor.value;
+                els.colorPreview.style.backgroundColor = color;
+                els.colorPreview.style.boxShadow = `0 0 10px ${color}`;
+                els.logoColor.style.color = color;
+                els.inputText.style.color = color;
+                els.inputText.style.borderColor = color;
+                els.inputText.style.boxShadow = `0 0 10px ${color}30`;
+                els.inputFont.style.borderColor = `${color}40`;
+                els.inputSize.style.borderColor = `${color}40`;
+                document.documentElement.style.setProperty('--led-color', color);
+
+                // Cor de Fundo
+                const bgColor = els.inputBgColor.value;
+                els.bgColorPreview.style.backgroundColor = bgColor;
+                els.bgColorPreview.style.boxShadow = `0 0 5px rgba(255,255,255,0.2)`;
+                document.documentElement.style.setProperty('--led-bg-color', bgColor);
+                document.body.style.backgroundColor = bgColor;
+                els.appWrapper.style.backgroundColor = bgColor;
+                const metaThemeColor = document.querySelector("meta[name=theme-color]");
+                if(metaThemeColor) metaThemeColor.setAttribute("content", bgColor);
+
+                // Fonte
+                els.inputText.style.fontFamily = els.inputFont.value.split(',')[0].replace(/'/g, "");
+
+                // Velocidade (Update do texto)
+                const val = parseInt(els.inputSpeed.value);
+                let label = "NORMAL";
+                if(val < 25) label = "LENTO";
+                else if(val > 70) label = "RÁPIDO";
+                else if(val > 90) label = "TURBO";
+                els.speedDisplay.innerText = label;
+
+            } catch(e) {
+                console.error("Erro ao carregar settings", e);
+            }
+        }
+
+        // ============================================
+        //      UI LISTENERS (+ SAVE)
+        // ============================================
         els.inputColor.addEventListener('input', (e) => {
             const color = e.target.value;
             els.colorPreview.style.backgroundColor = color;
@@ -344,6 +420,7 @@
             els.inputFont.style.borderColor = `${color}40`;
             els.inputSize.style.borderColor = `${color}40`;
             document.documentElement.style.setProperty('--led-color', color);
+            saveSettings();
         });
 
         els.inputBgColor.addEventListener('input', (e) => {
@@ -355,10 +432,12 @@
             els.appWrapper.style.backgroundColor = color;
             const metaThemeColor = document.querySelector("meta[name=theme-color]");
             if(metaThemeColor) metaThemeColor.setAttribute("content", color);
+            saveSettings();
         });
 
         els.inputFont.addEventListener('change', (e) => {
             els.inputText.style.fontFamily = e.target.value.split(',')[0].replace(/'/g, "");
+            saveSettings();
         });
 
         els.inputSpeed.addEventListener('input', (e) => {
@@ -368,7 +447,13 @@
             else if(val > 70) label = "RÁPIDO";
             else if(val > 90) label = "TURBO";
             els.speedDisplay.innerText = label;
+            saveSettings();
         });
+
+        els.inputText.addEventListener('input', saveSettings);
+        els.inputSize.addEventListener('change', saveSettings);
+        els.checkRotate.addEventListener('change', saveSettings);
+
 
         // --- CORE LOGIC ---
         function startApp() {
@@ -386,15 +471,10 @@
             if(shouldRotate) {
                 // MODO PAISAGEM (GIRADO)
                 els.displayContainer.classList.add('rotate-screen');
-                // CORREÇÃO CRÍTICA: 
-                // A "altura" do texto no modo girado deve ser relativa à LARGURA da tela (vw), 
-                // pois a tela foi girada 90 graus. 
-                // Usar 'vh' aqui faria o texto ficar do tamanho da ALTURA do celular (enorme).
                 els.ledText.style.fontSize = `${sizeBase}vw`; 
             } else {
                 // MODO RETRATO (NORMAL)
                 els.displayContainer.classList.remove('rotate-screen');
-                // Aqui usamos 'vh' pois queremos preencher a altura vertical normal.
                 els.ledText.style.fontSize = `${sizeBase}vh`;
             }
 
@@ -417,14 +497,9 @@
             const containerW = els.appWrapper.clientWidth;
             const containerH = els.appWrapper.clientHeight;
             
-            // Define o tamanho da "pista" de rolagem
             const viewWidth = isRotated ? containerH : containerW;
-            
-            // Reseta a posição inicial do letreiro
-            // Se girado, ajustamos um pouco o ponto de partida
             let position = viewWidth;
             
-            // Cálculo de velocidade
             const pixelsPerFrame = Math.pow(speedValue, 1.8) / 140; 
 
             if(animationFrameId) cancelAnimationFrame(animationFrameId);
@@ -432,13 +507,10 @@
             function step() {
                 position -= pixelsPerFrame;
 
-                // Reinicia quando o texto sair totalmente da tela
                 if (position < (-textWidth - (viewWidth * 0.2))) {
                     position = viewWidth; 
                 }
 
-                // Aplica a transformação. Nota: no CSS o .marquee-wrapper já está centralizado verticalmente
-                // então só precisamos mover o X.
                 els.marquee.style.transform = `translate(${position}px, -50%)`;
                 
                 if(els.displayContainer.classList.contains('active')) {
@@ -473,7 +545,6 @@
         // ============================================
         let wakeLock = null;
 
-        // 1. Tenta ativar o bloqueio
         async function requestWakeLock() {
             try {
                 if ('wakeLock' in navigator) {
@@ -485,21 +556,21 @@
             }
         }
 
-        // 2. Chama a função assim que carrega
         requestWakeLock();
 
-        // 3. Reativa se o usuário minimizou o app e voltou (Visibility Change)
         document.addEventListener('visibilitychange', async () => {
             if (wakeLock !== null && document.visibilityState === 'visible') {
                 await requestWakeLock();
             }
         });
 
-        // 4. Garante a ativação no primeiro clique (caso o navegador bloqueie o automático)
         document.addEventListener('click', function unlock() {
             requestWakeLock();
             document.removeEventListener('click', unlock);
         }, { once: true });
+
+        // INICIALIZAÇÃO
+        loadSettings(); // Carrega configurações salvas ao iniciar
 
     </script>
 </body>
