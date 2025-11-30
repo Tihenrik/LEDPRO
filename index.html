@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    
+    <meta name="theme-color" content="#000000">
+    <meta name="background-color" content="#000000">
+    
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="mobile-web-app-capable" content="yes">
+
+    <title>LEDPRO</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Anton&family=Bangers&family=Monoton&family=Orbitron:wght@900&family=Pacifico&family=Permanent+Marker&family=Press+Start+2P&family=Rubik+Mono+One&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --led-color: #00ff00;
+            --led-bg-color: #000000;
+            --led-size: 4px;
+            --led-spacing: 6px;
+        }
+
+        html {
+            background-color: #000000 !important;
+            height: 100%;
+            width: 100%;
+            overflow: hidden;
+        }
+
+        body {
+            background-color: #000000 !important;
+            color: white;
+            font-family: 'Segoe UI', sans-serif;
+            overflow: hidden;
+            touch-action: none; 
+            user-select: none;
+            height: 100dvh; 
+            width: 100%;
+            margin: 0;
+            padding: 0;
+            overscroll-behavior: none;
+            position: relative;
+        }
+
+        /* BACKUP: Garante fundo preto se o navegador tentar mostrar bordas */
+        body::before {
+            content: "";
+            position: fixed;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background-color: #000000;
+            z-index: -9999;
+            pointer-events: none;
+        }
+
+        /* WRAPPER GERAL para Fullscreen Isolado */
+        #app-wrapper {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            background-color: #000000;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        #app-wrapper:fullscreen {
+            width: 100vw;
+            height: 100vh;
+            background-color: black;
+            display: flex;
+        }
+        #app-wrapper::backdrop {
+            background-color: black;
+        }
+
+        /* --- UI Elements --- */
+        .glass-panel {
+            background: rgba(20, 20, 20, 0.85);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.6);
+            z-index: 20;
+        }
+
+        input[type="text"], input[type="range"], select {
+            accent-color: var(--led-color);
+        }
+
+        .custom-input {
+            background: #111;
+            border: 1px solid #333;
+            color: var(--led-color);
+            text-transform: uppercase;
+            transition: all 0.3s;
+        }
+        .custom-input:focus {
+            outline: none;
+            border-color: var(--led-color);
+            box-shadow: 0 0 15px var(--led-color);
+        }
+
+        select {
+            appearance: none;
+            background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23FFFFFF%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
+            background-repeat: no-repeat;
+            background-position: right 1rem center;
+            background-size: 0.65em auto;
+        }
+
+        /* --- DISPLAY CONTAINER --- */
+        #display-container {
+            position: absolute;
+            top: 0; 
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--led-bg-color);
+            z-index: 50;
+            display: flex;
+            align-items: center; /* Centraliza verticalmente o texto */
+            justify-content: flex-start; /* Texto começa da esquerda (será movido via JS) */
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+            overflow: hidden;
+            transform-origin: center center;
+            cursor: pointer;
+            
+            /* Remove padding que possa atrapalhar o tamanho "GIGANTE" */
+            padding: 0; 
+        }
+
+        #display-container.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .rotate-screen {
+            width: 100vh !important; 
+            height: 100vw !important;
+            
+            position: absolute !important;
+            top: 50% !important;
+            left: 50% !important;
+            transform: translate(-50%, -50%) rotate(90deg) !important;
+            margin: 0 !important;
+            
+            box-shadow: 0 0 0 100vmax var(--led-bg-color); 
+        }
+
+        .marquee-wrapper {
+            white-space: nowrap;
+            will-change: transform;
+            position: absolute;
+            left: 0;
+            /* Centraliza a faixa de texto verticalmente no container */
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            align-items: center;
+        }
+
+        .led-text {
+            /* Garante que a altura da linha seja compacta para caber na tela */
+            line-height: 0.85; 
+            font-weight: bold;
+            color: var(--led-color);
+            text-transform: uppercase;
+            text-shadow: 
+                0 0 5px var(--led-color),
+                0 0 10px var(--led-color),
+                0 0 20px var(--led-color);
+            padding-inline: 20px; 
+            white-space: nowrap;
+        }
+
+        .dot-matrix-overlay {
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            z-index: 60;
+            pointer-events: none;
+            background-image: radial-gradient(circle, transparent 35%, rgba(0,0,0,0.85) 42%);
+            background-size: var(--led-spacing) var(--led-spacing); 
+        }
+
+        .tap-hint {
+            position: fixed;
+            bottom: 40px; 
+            left: 50%;
+            transform: translateX(-50%);
+            color: rgba(255,255,255,0.5);
+            background: rgba(0,0,0,0.3);
+            padding: 5px 10px;
+            border-radius: 20px;
+            z-index: 70;
+            font-size: 0.8rem;
+            pointer-events: none;
+            text-transform: uppercase;
+            animation: pulse 3s infinite;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 0.2; }
+            50% { opacity: 0.8; }
+        }
+
+    </style>
+</head>
+<body class="bg-black">
+
+    <div id="app-wrapper">
+        <main id="setup-panel" class="flex-1 flex flex-col justify-center items-center p-4 w-full max-w-md mx-auto relative z-10 h-full">
+            
+            <div class="mb-5 text-center scale-90">
+                <h1 class="text-6xl font-black text-white mb-0 tracking-tighter" style="font-family: 'Share Tech Mono'">LED<span id="logo-color" class="text-green-500">PRO</span></h1>
+                <p class="text-gray-500 text-xs tracking-[0.3em] uppercase mt-1">Ultimate Edition</p>
+            </div>
+
+            <div class="glass-panel w-full p-5 rounded-3xl flex flex-col gap-4 shadow-2xl">
+                <div>
+                    <label class="text-[10px] font-bold text-gray-400 tracking-widest mb-1 ml-1 block">SUA MENSAGEM</label>
+                    <input type="text" id="input-text" class="custom-input w-full p-3 rounded-xl text-xl text-center font-bold tracking-wider" placeholder="TEXTO" value="BEM VINDO" style="font-family: 'Share Tech Mono'">
+                </div>
+
+                <div>
+                    <label class="text-[10px] font-bold text-gray-400 tracking-widest mb-1 ml-1 block">FONTE</label>
+                    <select id="input-font" class="w-full bg-[#151515] border border-[#333] text-white p-3 rounded-xl text-sm focus:outline-none focus:border-green-500 transition-colors cursor-pointer">
+                        <option value="'Share Tech Mono', monospace">DIGITAL (Padrão)</option>
+                        <option value="'Orbitron', sans-serif">FUTURISTA</option>
+                        <option value="'Monoton', cursive">NEON LINES</option>
+                        <option value="'Rubik Mono One', sans-serif">IMPACTO PESADO</option>
+                        <option value="'Permanent Marker', cursive">GRAFFITI</option>
+                        <option value="'Bangers', cursive">QUADRINHOS</option>
+                        <option value="'Pacifico', cursive">CURSIVA ELEGANTE</option>
+                    </select>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="bg-[#151515] rounded-xl border border-[#333] p-2 flex items-center justify-between px-3 relative overflow-hidden group hover:border-gray-500 transition-colors">
+                        <span class="text-[10px] font-bold text-gray-400 tracking-widest">TEXTO</span>
+                        <label class="relative w-8 h-8 rounded-full shadow-inner cursor-pointer hover:scale-110 transition-transform">
+                            <input type="color" id="input-color" value="#00ff00" class="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-20">
+                            <div id="color-preview" class="w-full h-full rounded-full bg-green-500 border-2 border-white/20 shadow-[0_0_10px_currentColor]"></div>
+                        </label>
+                    </div>
+
+                    <div class="bg-[#151515] rounded-xl border border-[#333] p-2 flex items-center justify-between px-3 relative overflow-hidden group hover:border-gray-500 transition-colors">
+                        <span class="text-[10px] font-bold text-gray-400 tracking-widest">FUNDO</span>
+                        <label class="relative w-8 h-8 rounded-full shadow-inner cursor-pointer hover:scale-110 transition-transform">
+                            <input type="color" id="input-bg-color" value="#000000" class="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-20">
+                            <div id="bg-color-preview" class="w-full h-full rounded-full bg-black border-2 border-white/20 shadow-sm"></div>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="relative">
+                        <label class="text-[9px] font-bold text-gray-500 tracking-widest mb-1 ml-1 block absolute -top-4 left-1">TAMANHO</label>
+                        <select id="input-size" class="w-full h-12 bg-[#151515] border border-[#333] text-white rounded-xl px-3 text-xs font-bold focus:outline-none focus:border-green-500 appearance-none">
+                            <option value="25">PEQUENO</option>
+                            <option value="50">MÉDIO</option>
+                            <option value="75">GRANDE</option>
+                            <option value="95" selected>GIGANTE</option>
+                        </select>
+                    </div>
+
+                    <div class="relative">
+                        <label class="text-[9px] font-bold text-gray-500 tracking-widest mb-1 ml-1 block absolute -top-4 left-1">
+                            VEL.: <span id="speed-display" class="text-green-400">NORMAL</span>
+                        </label>
+                        <div class="h-12 bg-[#151515] border border-[#333] rounded-xl flex items-center px-2">
+                            <input type="range" id="input-speed" min="10" max="100" value="50" class="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer">
+                        </div>
+                    </div>
+                </div>
+
+                <label class="flex items-center gap-3 p-3 mt-1 rounded-xl border border-white/5 bg-white/5 cursor-pointer hover:bg-white/10 transition-colors">
+                    <input type="checkbox" id="check-rotate" checked class="w-4 h-4 rounded accent-green-500">
+                    <div class="leading-tight">
+                        <span class="text-xs font-bold text-gray-200">Modo Paisagem (Girar Tela)</span>
+                    </div>
+                </label>
+
+                <button onclick="startApp()" class="mt-2 w-full bg-gradient-to-r from-green-600 to-green-400 text-black font-black text-lg py-4 rounded-xl shadow-[0_0_20px_rgba(34,197,94,0.3)] hover:shadow-[0_0_30px_rgba(34,197,94,0.5)] hover:scale-[1.02] active:scale-[0.98] transition-all uppercase tracking-widest">
+                    EXIBIR LETREIRO
+                </button>
+            </div>
+        </main>
+
+        <div id="display-container">
+            <div id="marquee" class="marquee-wrapper">
+                <span id="led-text" class="led-text"></span>
+            </div>
+            <div class="dot-matrix-overlay"></div>
+            <div class="tap-hint">Toque para voltar</div>
+        </div>
+    </div>
+
+    <script>
+        const els = {
+            appWrapper: document.getElementById('app-wrapper'),
+            inputText: document.getElementById('input-text'),
+            inputColor: document.getElementById('input-color'),
+            inputBgColor: document.getElementById('input-bg-color'),
+            inputSize: document.getElementById('input-size'),
+            inputFont: document.getElementById('input-font'),
+            inputSpeed: document.getElementById('input-speed'),
+            checkRotate: document.getElementById('check-rotate'),
+            
+            colorPreview: document.getElementById('color-preview'),
+            bgColorPreview: document.getElementById('bg-color-preview'),
+            
+            logoColor: document.getElementById('logo-color'),
+            speedDisplay: document.getElementById('speed-display'),
+            displayContainer: document.getElementById('display-container'),
+            marquee: document.getElementById('marquee'),
+            ledText: document.getElementById('led-text')
+        };
+
+        let animationFrameId;
+
+        // UI Updates
+        els.inputColor.addEventListener('input', (e) => {
+            const color = e.target.value;
+            els.colorPreview.style.backgroundColor = color;
+            els.colorPreview.style.boxShadow = `0 0 10px ${color}`;
+            els.logoColor.style.color = color;
+            els.inputText.style.color = color;
+            els.inputText.style.borderColor = color;
+            els.inputText.style.boxShadow = `0 0 10px ${color}30`;
+            els.inputFont.style.borderColor = `${color}40`;
+            els.inputSize.style.borderColor = `${color}40`;
+            document.documentElement.style.setProperty('--led-color', color);
+        });
+
+        els.inputBgColor.addEventListener('input', (e) => {
+            const color = e.target.value;
+            els.bgColorPreview.style.backgroundColor = color;
+            els.bgColorPreview.style.boxShadow = `0 0 5px rgba(255,255,255,0.2)`;
+            document.documentElement.style.setProperty('--led-bg-color', color);
+            document.body.style.backgroundColor = color;
+            els.appWrapper.style.backgroundColor = color;
+            const metaThemeColor = document.querySelector("meta[name=theme-color]");
+            if(metaThemeColor) metaThemeColor.setAttribute("content", color);
+        });
+
+        els.inputFont.addEventListener('change', (e) => {
+            els.inputText.style.fontFamily = e.target.value.split(',')[0].replace(/'/g, "");
+        });
+
+        els.inputSpeed.addEventListener('input', (e) => {
+            const val = parseInt(e.target.value);
+            let label = "NORMAL";
+            if(val < 25) label = "LENTO";
+            else if(val > 70) label = "RÁPIDO";
+            else if(val > 90) label = "TURBO";
+            els.speedDisplay.innerText = label;
+        });
+
+        // --- CORE LOGIC ---
+        function startApp() {
+            const text = els.inputText.value.trim() || "DIGITE ALGO";
+            let sizeBase = parseInt(els.inputSize.value); 
+            const speedVal = parseInt(els.inputSpeed.value);
+            const shouldRotate = els.checkRotate.checked;
+            const selectedFont = els.inputFont.value;
+
+            els.ledText.innerText = text;
+            els.ledText.style.fontFamily = selectedFont;
+            
+            window.scrollTo(0, 0);
+
+            if(shouldRotate) {
+                // MODO PAISAGEM (GIRADO)
+                els.displayContainer.classList.add('rotate-screen');
+                // CORREÇÃO CRÍTICA: 
+                // A "altura" do texto no modo girado deve ser relativa à LARGURA da tela (vw), 
+                // pois a tela foi girada 90 graus. 
+                // Usar 'vh' aqui faria o texto ficar do tamanho da ALTURA do celular (enorme).
+                els.ledText.style.fontSize = `${sizeBase}vw`; 
+            } else {
+                // MODO RETRATO (NORMAL)
+                els.displayContainer.classList.remove('rotate-screen');
+                // Aqui usamos 'vh' pois queremos preencher a altura vertical normal.
+                els.ledText.style.fontSize = `${sizeBase}vh`;
+            }
+
+            els.displayContainer.classList.add('active');
+            
+            // Ativa Fullscreen no Wrapper
+            if (els.appWrapper.requestFullscreen) {
+                els.appWrapper.requestFullscreen().catch(err => console.log(err));
+            } else if (els.appWrapper.webkitRequestFullscreen) {
+                els.appWrapper.webkitRequestFullscreen();
+            }
+
+            requestAnimationFrame(() => {
+                runMarquee(speedVal, shouldRotate);
+            });
+        }
+
+        function runMarquee(speedValue, isRotated) {
+            const textWidth = els.ledText.offsetWidth;
+            const containerW = els.appWrapper.clientWidth;
+            const containerH = els.appWrapper.clientHeight;
+            
+            // Define o tamanho da "pista" de rolagem
+            const viewWidth = isRotated ? containerH : containerW;
+            
+            // Reseta a posição inicial do letreiro
+            // Se girado, ajustamos um pouco o ponto de partida
+            let position = viewWidth;
+            
+            // Cálculo de velocidade
+            const pixelsPerFrame = Math.pow(speedValue, 1.8) / 140; 
+
+            if(animationFrameId) cancelAnimationFrame(animationFrameId);
+
+            function step() {
+                position -= pixelsPerFrame;
+
+                // Reinicia quando o texto sair totalmente da tela
+                if (position < (-textWidth - (viewWidth * 0.2))) {
+                    position = viewWidth; 
+                }
+
+                // Aplica a transformação. Nota: no CSS o .marquee-wrapper já está centralizado verticalmente
+                // então só precisamos mover o X.
+                els.marquee.style.transform = `translate(${position}px, -50%)`;
+                
+                if(els.displayContainer.classList.contains('active')) {
+                    animationFrameId = requestAnimationFrame(step);
+                }
+            }
+            step();
+        }
+
+        function stopApp() {
+            els.displayContainer.classList.remove('active');
+            if(animationFrameId) cancelAnimationFrame(animationFrameId);
+            
+            if (document.fullscreenElement || document.webkitFullscreenElement) {
+                if (document.exitFullscreen) document.exitFullscreen();
+                else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+            }
+        }
+
+        els.displayContainer.addEventListener('click', stopApp);
+        els.displayContainer.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            stopApp();
+        }, {passive: false});
+        
+        document.addEventListener('fullscreenchange', () => {
+            if (!document.fullscreenElement) stopApp();
+        });
+
+        // ============================================
+        //      SISTEMA WAKE LOCK (TELA SEMPRE ACESA)
+        // ============================================
+        let wakeLock = null;
+
+        // 1. Tenta ativar o bloqueio
+        async function requestWakeLock() {
+            try {
+                if ('wakeLock' in navigator) {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                    console.log('⚡ Wake Lock ativo: Tela configurada para não apagar.');
+                }
+            } catch (err) {
+                console.error(`Erro Wake Lock: ${err.name}, ${err.message}`);
+            }
+        }
+
+        // 2. Chama a função assim que carrega
+        requestWakeLock();
+
+        // 3. Reativa se o usuário minimizou o app e voltou (Visibility Change)
+        document.addEventListener('visibilitychange', async () => {
+            if (wakeLock !== null && document.visibilityState === 'visible') {
+                await requestWakeLock();
+            }
+        });
+
+        // 4. Garante a ativação no primeiro clique (caso o navegador bloqueie o automático)
+        document.addEventListener('click', function unlock() {
+            requestWakeLock();
+            document.removeEventListener('click', unlock);
+        }, { once: true });
+
+    </script>
+</body>
+</html>
